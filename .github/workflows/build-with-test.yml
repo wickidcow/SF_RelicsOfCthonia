@@ -15,6 +15,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.jar-meta.outputs.version }}
+      output_name: ${{ steps.jar-meta.outputs.output_name }}
 
     steps:
       - name: Checkout Repository
@@ -31,21 +34,24 @@ jobs:
         run: mvn -B clean package --file pom.xml
 
       - name: Verify Slimefun Legacy-style JAR name
+        id: jar-meta
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' pom.xml | head -n 1 | tr -d '\r')"
           test -n "$VERSION"
-          EXPECTED="target/SF_RelicsOfCthonia${VERSION}.jar"
+          OUTPUT_NAME="SF_RelicsOfCthonia${VERSION}.jar"
+          EXPECTED="target/${OUTPUT_NAME}"
           test -s "$EXPECTED"
           unzip -tqq "$EXPECTED"
-          echo "Built raw release JAR: $(basename "$EXPECTED")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "output_name=$OUTPUT_NAME" >> "$GITHUB_OUTPUT"
+          echo "Built raw release JAR: ${OUTPUT_NAME}"
 
       - name: Upload raw JAR artifact
         uses: actions/upload-artifact@v7
         with:
-          name: relics-of-cthonia-${{ github.sha }}
-          path: 'target/SF_RelicsOfCthonia*.jar'
+          path: target/${{ steps.jar-meta.outputs.output_name }}
           archive: false
           if-no-files-found: error
 
@@ -64,7 +70,7 @@ jobs:
       - name: Download Relics of Cthonia JAR
         uses: actions/download-artifact@v7
         with:
-          name: relics-of-cthonia-${{ github.sha }}
+          name: ${{ needs.build.outputs.output_name }}
           path: server/plugins
 
       - name: Download latest stable Paper 26.2 and Slimefun Legacy
@@ -159,16 +165,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' pom.xml | head -n 1 | tr -d '\r')"
+          VERSION="${{ needs.build.outputs.version }}"
+          OUTPUT_NAME="${{ needs.build.outputs.output_name }}"
           test -n "$VERSION"
+          test -n "$OUTPUT_NAME"
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
-          echo "OUTPUT_NAME=SF_RelicsOfCthonia${VERSION}.jar" >> "$GITHUB_ENV"
+          echo "OUTPUT_NAME=$OUTPUT_NAME" >> "$GITHUB_ENV"
 
       - name: Download validated raw JAR
         uses: actions/download-artifact@v7
         with:
-          name: relics-of-cthonia-${{ github.sha }}
+          name: ${{ needs.build.outputs.output_name }}
           path: dist
 
       - name: Verify validated release asset
