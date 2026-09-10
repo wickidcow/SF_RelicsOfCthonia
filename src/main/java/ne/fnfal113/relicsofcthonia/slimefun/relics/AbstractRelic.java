@@ -5,7 +5,6 @@ import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack;
 import io.github.thebusybiscuit.slimefun4.implementation.items.blocks.UnplaceableBlock;
-import io.github.thebusybiscuit.slimefun4.libraries.dough.data.persistent.PersistentDataAPI;
 import lombok.Getter;
 import ne.fnfal113.relicsofcthonia.RelicsOfCthonia;
 import ne.fnfal113.relicsofcthonia.RelicsRegistry;
@@ -19,6 +18,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
@@ -65,14 +66,19 @@ public abstract class AbstractRelic extends UnplaceableBlock {
 
     public ItemStack randomRelic() {
         ItemStack itemStack = templateItem.clone();
-        int condition = ThreadLocalRandom.current().nextInt(1,100);
-        itemStack.editMeta(meta -> PersistentDataAPI.setInt(meta, Keys.RELIC_CONDITION, condition));
-        Utils.replaceLoreValue(itemStack, "%", "&d", "","%", condition);
+        int condition = ThreadLocalRandom.current().nextInt(1, 100);
+        itemStack.editMeta(meta -> meta.getPersistentDataContainer().set(Keys.RELIC_CONDITION, PersistentDataType.INTEGER, condition));
+        Utils.replaceLoreValue(itemStack, "%", "&d", "", "%", condition);
         return itemStack;
     }
 
-    public static int getRelicCondition(@Nonnull ItemStack itemStack){
-        return PersistentDataAPI.getInt(itemStack.getItemMeta(), Keys.RELIC_CONDITION, 0);
+    public static int getRelicCondition(@Nonnull ItemStack itemStack) {
+        ItemMeta meta = itemStack.getItemMeta();
+        if (meta == null) {
+            return 0;
+        }
+        Integer condition = meta.getPersistentDataContainer().get(Keys.RELIC_CONDITION, PersistentDataType.INTEGER);
+        return condition == null ? 0 : condition;
     }
 
     public void postInit() {
@@ -93,7 +99,6 @@ public abstract class AbstractRelic extends UnplaceableBlock {
                 return;
             }
 
-            // retrieve this relic's config material list then add to relic registry
             if (section.contains("drops-on-material")) {
                 for (String material : section.getStringList("drops-on-material")) {
                     Material mat = Material.matchMaterial(material);
@@ -114,8 +119,7 @@ public abstract class AbstractRelic extends UnplaceableBlock {
                 RelicsOfCthonia.getInstance().getLogger().warning("No 'drops-on-material' section found for relic: " + this.getId());
             }
 
-            // retrieve this relic's config mob list then add to relic registry
-            if(section.contains("drops-on-mob")) {
+            if (section.contains("drops-on-mob")) {
                 for (String type : section.getStringList("drops-on-mob")) {
                     try {
                         EntityType entityType = EntityType.valueOf(type.toUpperCase());
@@ -135,7 +139,6 @@ public abstract class AbstractRelic extends UnplaceableBlock {
                 RelicsOfCthonia.getInstance().getLogger().warning("No 'drops-on-mob' section found for relic: " + this.getId());
             }
 
-            // retrieve this relic's config rewards list then add to relic registry
             if (section.contains("piglin-barter-rewards")) {
                 for (String id : section.getStringList("piglin-barter-rewards")) {
                     Material material = Material.matchMaterial(id);
@@ -156,7 +159,7 @@ public abstract class AbstractRelic extends UnplaceableBlock {
             } else {
                 RelicsOfCthonia.getInstance().getLogger().warning("No 'piglin-barter-rewards' section found for relic: " + this.getId());
             }
-        } catch (Exception e){
+        } catch (Exception e) {
             RelicsOfCthonia.getInstance().getLogger().info("An error has occurred on adding data to relics registry! Please report on github issue tracker!");
             e.printStackTrace();
         }
@@ -169,7 +172,7 @@ public abstract class AbstractRelic extends UnplaceableBlock {
         try {
             CONFIG_MANAGER.initializeConfig(this.getId(), "drop-chance", dropChance, "relic-settings");
             CONFIG_MANAGER.initializeConfig(this.getId(), "piglin-reward-amount", piglinRewardAmount, "relic-settings");
-        } catch (IllegalArgumentException | NullPointerException e){
+        } catch (IllegalArgumentException | NullPointerException e) {
             RelicsOfCthonia.getInstance().getLogger().info("An error has occurred upon initializing default single section settings! Please report on github issue tracker!");
             e.printStackTrace();
         }
@@ -182,26 +185,23 @@ public abstract class AbstractRelic extends UnplaceableBlock {
             List<String> randomMobList = new ArrayList<>();
             List<String> randomMaterialList = new ArrayList<>();
 
-            // retrieve json resource for nether mobs and
-            // create a randomized mob list, size determined dy this object default drop size
             for (int i = 0; i < defaultDropSize; i++) {
                 String mob = jsonObject.getAsJsonPrimitive("nether_mob_" + random.nextInt(1, 12)).getAsString();
-                if(!randomMobList.contains(mob)) {
+                if (!randomMobList.contains(mob)) {
                     randomMobList.add(mob);
                 }
             }
 
-            // create a randomized material list, size determined dy this object default drop size
             for (int i = 0; i < defaultDropSize; i++) {
                 String material = DEFAULT_BLOCK_SOURCES.get(random.nextInt(0, DEFAULT_BLOCK_SOURCES.size())).toString();
-                if(!randomMaterialList.contains(material)) {
+                if (!randomMaterialList.contains(material)) {
                     randomMaterialList.add(material);
                 }
             }
 
             CONFIG_MANAGER.initializeConfig(getId(), "drops-on-mob", randomMobList, "relic-settings");
             CONFIG_MANAGER.initializeConfig(getId(), "drops-on-material", randomMaterialList, "relic-settings");
-        } catch (IllegalArgumentException | NullPointerException e){
+        } catch (IllegalArgumentException | NullPointerException e) {
             RelicsOfCthonia.getInstance().getLogger().info("An error has occurred upon initializing default drop settings! Please report on github issue tracker!");
             e.printStackTrace();
         }
@@ -212,17 +212,15 @@ public abstract class AbstractRelic extends UnplaceableBlock {
             JsonObject jsonObject = CONFIG_MANAGER.loadJson("piglin_barter_list");
             List<String> randomRewardList = new ArrayList<>();
 
-            // retrieve json resource for barter rewards and
-            // create a randomized reward list, size determined dy this object default drop size
             for (int i = 1; i <= defaultDropSize; i++) {
-                String reward = jsonObject.getAsJsonObject(rarity.name()).get("drop-" + ThreadLocalRandom.current().nextInt(1,8)).getAsString();
-                if(!randomRewardList.contains(reward)) {
+                String reward = jsonObject.getAsJsonObject(rarity.name()).get("drop-" + ThreadLocalRandom.current().nextInt(1, 8)).getAsString();
+                if (!randomRewardList.contains(reward)) {
                     randomRewardList.add(reward);
                 }
             }
 
             CONFIG_MANAGER.initializeConfig(getId(), "piglin-barter-rewards", randomRewardList, "relic-settings");
-        } catch (IllegalArgumentException | NullPointerException e){
+        } catch (IllegalArgumentException | NullPointerException e) {
             RelicsOfCthonia.getInstance().getLogger().info("An error has occurred upon initializing default piglin rewards! Please report on github issue tracker!");
             e.printStackTrace();
         }
@@ -234,7 +232,7 @@ public abstract class AbstractRelic extends UnplaceableBlock {
     }
 
     @Override
-    public boolean isEnchantable(){
+    public boolean isEnchantable() {
         return false;
     }
 }
