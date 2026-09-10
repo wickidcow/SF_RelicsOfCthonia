@@ -22,9 +22,9 @@ public class EyeOfSauron extends AbstractRelic {
         addItemHandler((OffHandRightClickHandler) (event, player, offHand) -> {
             List<Player> players = new ArrayList<>();
             for (Entity entity : player.getNearbyEntities(100, 60, 100)) {
-                if (entity instanceof Player other){
+                if (entity instanceof Player other) {
                     Location location = other.getLocation();
-                    Utils.sendRelicMessage("&eEye of Sauron found a nearby player named " + player.getName()
+                    Utils.sendRelicMessage("&eEye of Sauron found a nearby player named " + other.getName()
                             + " at x: " + location.getBlockX() + " y: " + location.getBlockY() + " z: " + location.getBlockZ(), player);
                     players.add(other);
                 }
@@ -35,5 +35,4 @@ public class EyeOfSauron extends AbstractRelic {
             offHand.subtract();
         });
     }
-
 }
