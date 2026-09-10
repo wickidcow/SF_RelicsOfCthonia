@@ -71,7 +71,25 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: ${{ needs.build.outputs.output_name }}
-          path: server/plugins
+          path: server/raw-relics
+
+      - name: Normalize raw JAR into plugins directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT_NAME='${{ needs.build.outputs.output_name }}'
+          mkdir -p server/plugins
+          echo 'Raw artifact download contents:'
+          find server/raw-relics -maxdepth 4 -type f -print
+          RELIC_JAR="$(find server/raw-relics -type f -name "$OUTPUT_NAME" -print -quit)"
+          if [[ -z "$RELIC_JAR" ]]; then
+            RELIC_JAR="$(find server/raw-relics -type f -name 'SF_RelicsOfCthonia*.jar' -print -quit)"
+          fi
+          test -n "$RELIC_JAR"
+          test -s "$RELIC_JAR"
+          cp "$RELIC_JAR" "server/plugins/$OUTPUT_NAME"
+          unzip -tqq "server/plugins/$OUTPUT_NAME"
+          test -s "server/plugins/$OUTPUT_NAME"
 
       - name: Download latest stable Paper 26.2 and Slimefun Legacy
         shell: bash
@@ -106,6 +124,9 @@ jobs:
           set -euo pipefail
           cd server
           echo 'eula=true' > eula.txt
+
+          echo 'Plugin directory before startup:'
+          find plugins -maxdepth 1 -type f -printf '%f\n' | sort
 
           java -Xms512M -Xmx1G -jar paper.jar --nogui > console.log 2>&1 &
           SERVER_PID=$!
@@ -177,13 +198,20 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: ${{ needs.build.outputs.output_name }}
-          path: dist
+          path: dist/raw
 
-      - name: Verify validated release asset
+      - name: Normalize and verify validated release asset
         shell: bash
         run: |
           set -euo pipefail
-          JAR="dist/${OUTPUT_NAME}"
+          mkdir -p dist/release
+          SOURCE_JAR="$(find dist/raw -type f -name "$OUTPUT_NAME" -print -quit)"
+          if [[ -z "$SOURCE_JAR" ]]; then
+            SOURCE_JAR="$(find dist/raw -type f -name 'SF_RelicsOfCthonia*.jar' -print -quit)"
+          fi
+          test -n "$SOURCE_JAR"
+          cp "$SOURCE_JAR" "dist/release/$OUTPUT_NAME"
+          JAR="dist/release/${OUTPUT_NAME}"
           test -s "$JAR"
           unzip -tqq "$JAR"
           sha256sum "$JAR" | tee release.sha256
@@ -196,7 +224,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          JAR="dist/${OUTPUT_NAME}"
+          JAR="dist/release/${OUTPUT_NAME}"
           NOTES_FILE="docs/releases/${RELEASE_VERSION}.md"
           TITLE="Relics of Cthonia ${RELEASE_VERSION} — Slimefun Legacy"
 
