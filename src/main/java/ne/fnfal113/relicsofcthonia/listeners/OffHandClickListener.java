@@ -13,9 +13,9 @@ import org.bukkit.inventory.ItemStack;
 public class OffHandClickListener implements Listener {
 
     @EventHandler
-    public void onOffHandRightClick(PlayerInteractEvent event){
-        if (event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK
-                || event.getHand() == EquipmentSlot.HAND) {
+    public void onOffHandRightClick(PlayerInteractEvent event) {
+        if (event.getHand() != EquipmentSlot.OFF_HAND
+                || (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)) {
             return;
         }
 
@@ -26,5 +26,4 @@ public class OffHandClickListener implements Listener {
             item.callItemHandler(OffHandRightClickHandler.class, handler -> handler.onItemRightClick(event, player, itemStack));
         }
     }
-
 }
