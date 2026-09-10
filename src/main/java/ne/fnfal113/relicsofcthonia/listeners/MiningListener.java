@@ -14,6 +14,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,7 +25,7 @@ public class MiningListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (event.isCancelled() || event.getPlayer().getWorld().getEnvironment() != World.Environment.NETHER) {
+        if (event.getPlayer().getWorld().getEnvironment() != World.Environment.NETHER) {
             return;
         }
 
@@ -36,12 +37,13 @@ public class MiningListener implements Listener {
             return;
         }
 
-        int dropped = 0;
-        List<AbstractRelic> relics = RelicsRegistry.BLOCK_SOURCES.get(block.getType());
-        if (relics == null || relics.isEmpty()) {
+        List<AbstractRelic> registeredRelics = RelicsRegistry.BLOCK_SOURCES.get(block.getType());
+        if (registeredRelics == null || registeredRelics.isEmpty()) {
             return;
         }
 
+        int dropped = 0;
+        List<AbstractRelic> relics = new ArrayList<>(registeredRelics);
         Collections.shuffle(relics);
         for (AbstractRelic relic : relics) {
             if (relic.isDisabledIn(event.getPlayer().getWorld()) || relic.isDisabled()) {
