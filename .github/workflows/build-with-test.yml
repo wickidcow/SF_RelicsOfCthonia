@@ -125,3 +125,8 @@ jobs:
             echo 'Relics of Cthonia did not appear in the Paper startup log.' >&2
             exit 1
           fi
+
+          if ! grep -q 'Addon status: 1 tested-compatible, 0 incompatible, 0 undeclared' console.log; then
+            echo 'Slimefun Legacy did not classify Relics of Cthonia as tested-compatible.' >&2
+            exit 1
+          fi
