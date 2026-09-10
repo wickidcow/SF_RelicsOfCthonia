@@ -6,7 +6,7 @@
 
     <groupId>ne.fnfal113</groupId>
     <artifactId>RelicsOfCthonia</artifactId>
-    <version>Unofficial-2.0.0</version>
+    <version>Unofficial-2.0.1</version>
     <packaging>jar</packaging>
 
     <name>RelicsOfCthonia</name>
@@ -14,13 +14,15 @@
     <description>My Slimefun addon jam 2022 entry which is based on nether theme</description>
     <properties>
         <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.44</lombok.version>
     </properties>
 
-    <url>https://github.com/FN-FAL113/RelicsOfCthonia</url>
+    <url>https://github.com/wickidcow/SF_RelicsOfCthonia</url>
 
     <build>
-        <finalName>${project.name} v${project.version}</finalName>
+        <finalName>SF_RelicsOfCthonia${project.version}</finalName>
         <defaultGoal>clean package</defaultGoal>
         <sourceDirectory>${basedir}/src/main/java</sourceDirectory>
 
@@ -41,13 +43,12 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <release>${maven.compiler.release}</release>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.30</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -95,8 +96,8 @@
         </repository>
 
         <repository>
-            <id>paper-repo</id>
-            <url>https://repo.destroystokyo.com/repository/maven-public/</url>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
 
         <repository>
@@ -109,7 +110,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.20.6-R0.1-SNAPSHOT</version>
+            <version>[26.2.build,)</version>
             <scope>provided</scope>
         </dependency>
 
@@ -137,14 +138,14 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version>
+            <version>${lombok.version}</version>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
             <groupId>org.bstats</groupId>
             <artifactId>bstats-bukkit</artifactId>
-            <version>3.0.0</version>
+            <version>3.2.1</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>
