@@ -12,6 +12,8 @@ permissions:
 jobs:
   blob-build-deploy:
     runs-on: ubuntu-latest
+    env:
+      BLOB_BUILDS_API_TOKEN: ${{ secrets.BLOB_BUILDS_API_TOKEN }}
 
     steps:
       - name: Checkout Repository
@@ -28,8 +30,13 @@ jobs:
         run: mvn -B clean package
 
       - name: Upload to Blob Builds
+        if: env.BLOB_BUILDS_API_TOKEN != ''
         uses: WalshyDev/blob-builds/gh-action@main
         with:
           project: RelicsOfCthonia
-          apiToken: ${{ secrets.BLOB_BUILDS_API_TOKEN }}
+          apiToken: ${{ env.BLOB_BUILDS_API_TOKEN }}
           releaseNotes: ${{ github.event.head_commit.message }}
+
+      - name: Skip Blob Builds upload
+        if: env.BLOB_BUILDS_API_TOKEN == ''
+        run: echo 'BLOB_BUILDS_API_TOKEN is not configured; build succeeded and external upload was skipped.'
