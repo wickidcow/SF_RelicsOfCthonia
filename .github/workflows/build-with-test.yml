@@ -1,4 +1,4 @@
-name: Build with Maven and Do Runtime Test
+name: Build with Maven, Runtime Test, and Release
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
@@ -30,11 +30,23 @@ jobs:
       - name: Maven Build
         run: mvn -B clean package --file pom.xml
 
-      - name: Upload the artifact
-        uses: actions/upload-artifact@v4
+      - name: Verify Slimefun Legacy-style JAR name
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' pom.xml | head -n 1 | tr -d '\r')"
+          test -n "$VERSION"
+          EXPECTED="target/SF_RelicsOfCthonia${VERSION}.jar"
+          test -s "$EXPECTED"
+          unzip -tqq "$EXPECTED"
+          echo "Built raw release JAR: $(basename "$EXPECTED")"
+
+      - name: Upload raw JAR artifact
+        uses: actions/upload-artifact@v7
         with:
           name: relics-of-cthonia-${{ github.sha }}
           path: 'target/SF_RelicsOfCthonia*.jar'
+          archive: false
           if-no-files-found: error
 
   runtime-test:
@@ -49,8 +61,8 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Download Relics of Cthonia artifact
-        uses: actions/download-artifact@v4
+      - name: Download Relics of Cthonia JAR
+        uses: actions/download-artifact@v7
         with:
           name: relics-of-cthonia-${{ github.sha }}
           path: server/plugins
@@ -61,7 +73,7 @@ jobs:
           set -euo pipefail
           mkdir -p server/plugins
 
-          USER_AGENT='SF_RelicsOfCthonia-CI/2.0.1 (github.com/wickidcow/SF_RelicsOfCthonia)'
+          USER_AGENT='SF_RelicsOfCthonia-CI (github.com/wickidcow/SF_RelicsOfCthonia)'
           PAPER_BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" \
             https://fill.papermc.io/v3/projects/paper/versions/26.2/builds)
           PAPER_URL=$(echo "${PAPER_BUILDS}" | jq -r 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url) // empty')
@@ -129,4 +141,75 @@ jobs:
           if ! grep -q 'Addon compatibility: 1 compatible, 0 warning, 0 undeclared, 0 incompatible, 0 disabled' console.log; then
             echo 'Slimefun Legacy did not classify Relics of Cthonia as compatible.' >&2
             exit 1
+          fi
+
+  release:
+    name: Publish raw GitHub Release JAR
+    needs: [build, runtime-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' pom.xml | head -n 1 | tr -d '\r')"
+          test -n "$VERSION"
+          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
+          echo "OUTPUT_NAME=SF_RelicsOfCthonia${VERSION}.jar" >> "$GITHUB_ENV"
+
+      - name: Download validated raw JAR
+        uses: actions/download-artifact@v7
+        with:
+          name: relics-of-cthonia-${{ github.sha }}
+          path: dist
+
+      - name: Verify validated release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="dist/${OUTPUT_NAME}"
+          test -s "$JAR"
+          unzip -tqq "$JAR"
+          sha256sum "$JAR" | tee release.sha256
+          echo "Release asset: ${OUTPUT_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA-256: $(awk '{print $1}' release.sha256)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="dist/${OUTPUT_NAME}"
+          NOTES_FILE="docs/releases/${RELEASE_VERSION}.md"
+          TITLE="Relics of Cthonia ${RELEASE_VERSION} — Slimefun Legacy"
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha')"
+            if [[ "$TAG_SHA" != "$GITHUB_SHA" ]]; then
+              echo "${RELEASE_TAG} is already published from ${TAG_SHA}; not replacing a released version from a different commit."
+              echo 'Bump the Maven project version for the next release.'
+              exit 0
+            fi
+
+            gh release upload "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
+            if [[ -f "$NOTES_FILE" ]]; then
+              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file "$NOTES_FILE"
+            else
+              gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE"
+            fi
+          else
+            if [[ -f "$NOTES_FILE" ]]; then
+              gh release create "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$NOTES_FILE"
+            else
+              gh release create "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --generate-notes
+            fi
           fi
