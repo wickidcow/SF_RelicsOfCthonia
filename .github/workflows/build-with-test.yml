@@ -18,6 +18,7 @@ jobs:
     outputs:
       version: ${{ steps.jar-meta.outputs.version }}
       output_name: ${{ steps.jar-meta.outputs.output_name }}
+      handoff_name: ${{ steps.jar-meta.outputs.handoff_name }}
 
     steps:
       - name: Checkout Repository
@@ -41,11 +42,13 @@ jobs:
           VERSION="$(sed -n 's:.*<version>\([^<]*\)</version>.*:\1:p' pom.xml | head -n 1 | tr -d '\r')"
           test -n "$VERSION"
           OUTPUT_NAME="SF_RelicsOfCthonia${VERSION}.jar"
+          HANDOFF_NAME="relics-ci-${GITHUB_SHA}"
           EXPECTED="target/${OUTPUT_NAME}"
           test -s "$EXPECTED"
           unzip -tqq "$EXPECTED"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "output_name=$OUTPUT_NAME" >> "$GITHUB_OUTPUT"
+          echo "handoff_name=$HANDOFF_NAME" >> "$GITHUB_OUTPUT"
           echo "Built raw release JAR: ${OUTPUT_NAME}"
 
       - name: Upload raw JAR artifact
@@ -53,6 +56,13 @@ jobs:
         with:
           path: target/${{ steps.jar-meta.outputs.output_name }}
           archive: false
+          if-no-files-found: error
+
+      - name: Upload CI handoff artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.jar-meta.outputs.handoff_name }}
+          path: target/${{ steps.jar-meta.outputs.output_name }}
           if-no-files-found: error
 
   runtime-test:
@@ -67,29 +77,19 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Download Relics of Cthonia JAR
+      - name: Download validated Relics of Cthonia JAR
         uses: actions/download-artifact@v7
         with:
-          name: ${{ needs.build.outputs.output_name }}
-          path: server/raw-relics
+          name: ${{ needs.build.outputs.handoff_name }}
+          path: server/plugins
 
-      - name: Normalize raw JAR into plugins directory
+      - name: Verify downloaded plugin JAR
         shell: bash
         run: |
           set -euo pipefail
           OUTPUT_NAME='${{ needs.build.outputs.output_name }}'
-          mkdir -p server/plugins
-          echo 'Raw artifact download contents:'
-          find server/raw-relics -maxdepth 4 -type f -print
-          RELIC_JAR="$(find server/raw-relics -type f -name "$OUTPUT_NAME" -print -quit)"
-          if [[ -z "$RELIC_JAR" ]]; then
-            RELIC_JAR="$(find server/raw-relics -type f -name 'SF_RelicsOfCthonia*.jar' -print -quit)"
-          fi
-          test -n "$RELIC_JAR"
-          test -s "$RELIC_JAR"
-          cp "$RELIC_JAR" "server/plugins/$OUTPUT_NAME"
-          unzip -tqq "server/plugins/$OUTPUT_NAME"
           test -s "server/plugins/$OUTPUT_NAME"
+          unzip -tqq "server/plugins/$OUTPUT_NAME"
 
       - name: Download latest stable Paper 26.2 and Slimefun Legacy
         shell: bash
@@ -194,24 +194,17 @@ jobs:
           echo "RELEASE_TAG=v$VERSION" >> "$GITHUB_ENV"
           echo "OUTPUT_NAME=$OUTPUT_NAME" >> "$GITHUB_ENV"
 
-      - name: Download validated raw JAR
+      - name: Download validated JAR from CI handoff
         uses: actions/download-artifact@v7
         with:
-          name: ${{ needs.build.outputs.output_name }}
-          path: dist/raw
+          name: ${{ needs.build.outputs.handoff_name }}
+          path: dist
 
-      - name: Normalize and verify validated release asset
+      - name: Verify validated release asset
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist/release
-          SOURCE_JAR="$(find dist/raw -type f -name "$OUTPUT_NAME" -print -quit)"
-          if [[ -z "$SOURCE_JAR" ]]; then
-            SOURCE_JAR="$(find dist/raw -type f -name 'SF_RelicsOfCthonia*.jar' -print -quit)"
-          fi
-          test -n "$SOURCE_JAR"
-          cp "$SOURCE_JAR" "dist/release/$OUTPUT_NAME"
-          JAR="dist/release/${OUTPUT_NAME}"
+          JAR="dist/${OUTPUT_NAME}"
           test -s "$JAR"
           unzip -tqq "$JAR"
           sha256sum "$JAR" | tee release.sha256
@@ -224,7 +217,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          JAR="dist/release/${OUTPUT_NAME}"
+          JAR="dist/${OUTPUT_NAME}"
           NOTES_FILE="docs/releases/${RELEASE_VERSION}.md"
           TITLE="Relics of Cthonia ${RELEASE_VERSION} — Slimefun Legacy"
 
