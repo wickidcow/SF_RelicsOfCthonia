@@ -1,7 +1,7 @@
 name: RelicsOfCthonia
 version: '${project.version}'
 main: ne.fnfal113.relicsofcthonia.RelicsOfCthonia
-api-version: '26.2'
+api-version: '1.21.11'
 authors: [ FN_FAL113 ]
 contributors: [ wickidcow ]
 description: My Slimefun addon jam 2022 entry which is based on nether theme
