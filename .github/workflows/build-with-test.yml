@@ -31,7 +31,7 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Maven Build
+      - name: Maven Build against Paper 1.21.11 baseline
         run: mvn -B clean package --file pom.xml
 
       - name: Verify Slimefun Legacy-style JAR name
@@ -51,6 +51,22 @@ jobs:
           echo "handoff_name=$HANDOFF_NAME" >> "$GITHUB_OUTPUT"
           echo "Built raw release JAR: ${OUTPUT_NAME}"
 
+      - name: Verify 1.21.11 compatibility artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="target/${{ steps.jar-meta.outputs.output_name }}"
+          unzip -p "$JAR" plugin.yml | tee /tmp/relics-plugin.yml
+          grep -F "name: RelicsOfCthonia" /tmp/relics-plugin.yml
+          grep -F "api-version: '1.21.11'" /tmp/relics-plugin.yml
+
+          unzip -p "$JAR" slimefun-compatibility.json | tee /tmp/relics-compat.json
+          grep -F '"minimum_minecraft": "1.21.11"' /tmp/relics-compat.json
+
+          echo "Verifying Java 21 bytecode"
+          javap -verbose -classpath "$JAR" ne.fnfal113.relicsofcthonia.RelicsOfCthonia \
+            | grep -F "major version: 65"
+
       - name: Upload raw JAR artifact
         uses: actions/upload-artifact@v7
         with:
@@ -66,9 +82,15 @@ jobs:
           if-no-files-found: error
 
   runtime-test:
-    name: Paper 26.2 + Slimefun Legacy Runtime Smoke
+    name: Paper ${{ matrix.paper_version }} + Slimefun Legacy Runtime Smoke
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        paper_version:
+          - '1.21.11'
+          - '26.2'
 
     steps:
       - name: Set up JDK 25
@@ -91,18 +113,20 @@ jobs:
           test -s "server/plugins/$OUTPUT_NAME"
           unzip -tqq "server/plugins/$OUTPUT_NAME"
 
-      - name: Download latest stable Paper 26.2 and Slimefun Legacy
+      - name: Download stable Paper and Slimefun Legacy
         shell: bash
+        env:
+          PAPER_VERSION: ${{ matrix.paper_version }}
         run: |
           set -euo pipefail
           mkdir -p server/plugins
 
           USER_AGENT='SF_RelicsOfCthonia-CI (github.com/wickidcow/SF_RelicsOfCthonia)'
           PAPER_BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" \
-            https://fill.papermc.io/v3/projects/paper/versions/26.2/builds)
+            "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds")
           PAPER_URL=$(echo "${PAPER_BUILDS}" | jq -r 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url) // empty')
           if [ -z "${PAPER_URL}" ]; then
-            echo 'No stable Paper 26.2 build was returned by the PaperMC Fill API.' >&2
+            echo "No stable Paper ${PAPER_VERSION} build was returned by the PaperMC Fill API." >&2
             exit 1
           fi
           curl -fsSL -H "User-Agent: ${USER_AGENT}" -o server/paper.jar "${PAPER_URL}"
@@ -155,8 +179,8 @@ jobs:
             exit 1
           fi
 
-          if grep -Eiq "Error occurred while enabling RelicsOfCthonia|Could not load.*RelicsOfCthonia|NoClassDefFoundError.*relicsofcthonia|NoSuchMethodError.*relicsofcthonia" console.log; then
-            echo 'Relics of Cthonia reported a runtime linkage/enable failure.' >&2
+          if grep -Eiq "Unsupported API version|Error occurred while enabling RelicsOfCthonia|Could not load.*RelicsOfCthonia|NoClassDefFoundError.*relicsofcthonia|NoSuchMethodError.*relicsofcthonia" console.log; then
+            echo 'Relics of Cthonia reported an API/runtime linkage or enable failure.' >&2
             exit 1
           fi
 
