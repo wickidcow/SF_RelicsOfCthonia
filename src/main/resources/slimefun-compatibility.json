@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "tested_core_variants": ["legacy"],
-  "minimum_minecraft": "26.2",
+  "minimum_minecraft": "1.21.11",
   "minimum_java": 21,
   "required_capabilities": ["PAPER_API"],
   "accepted_platform_families": ["PAPER", "PURPUR"],
   "required_plugins": [],
   "optional_plugins": [],
-  "notes": "Validated on Paper 26.2 with Slimefun Legacy 4.1.49; gameplay, item IDs, recipes, and persisted relic data remain compatible with the maintained 2.0.x line."
+  "notes": "Validated for Paper 1.21.11 through 26.2 with Slimefun Legacy; gameplay, item IDs, recipes, and persisted relic data remain compatible with the maintained 2.0.x line."
 }
