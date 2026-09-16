@@ -31,8 +31,17 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Maven Build against Paper 1.21.11 baseline
-        run: mvn -B clean package --file pom.xml
+      - name: Verify Paper 1.21.11 API floor
+        run: mvn -B -ntp -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean package --file pom.xml
+
+      - name: Verify Paper 26.2 primary compatibility
+        run: mvn -B -ntp -Dpaper.version=26.2.build.112-stable clean package --file pom.xml
+
+      - name: Verify Paper 26.3 alpha compatibility
+        run: mvn -B -ntp -Dpaper.version=26.3-rc-3.build.1-alpha clean package --file pom.xml
+
+      - name: Rebuild universal release JAR from 1.21.11 baseline
+        run: mvn -B -ntp -Dpaper.version=1.21.11-R0.1-SNAPSHOT clean package --file pom.xml
 
       - name: Verify Slimefun Legacy-style JAR name
         id: jar-meta
@@ -59,13 +68,10 @@ jobs:
           unzip -p "$JAR" plugin.yml | tee /tmp/relics-plugin.yml
           grep -F "name: RelicsOfCthonia" /tmp/relics-plugin.yml
           grep -F "api-version: '1.21.11'" /tmp/relics-plugin.yml
-
           unzip -p "$JAR" slimefun-compatibility.json | tee /tmp/relics-compat.json
           grep -F '"minimum_minecraft": "1.21.11"' /tmp/relics-compat.json
-
           echo "Verifying Java 21 bytecode"
-          javap -verbose -classpath "$JAR" ne.fnfal113.relicsofcthonia.RelicsOfCthonia \
-            | grep -F "major version: 65"
+          javap -verbose -classpath "$JAR" ne.fnfal113.relicsofcthonia.RelicsOfCthonia | grep -F "major version: 65"
 
       - name: Upload raw JAR artifact
         uses: actions/upload-artifact@v7
@@ -120,21 +126,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p server/plugins
-
           USER_AGENT='SF_RelicsOfCthonia-CI (github.com/wickidcow/SF_RelicsOfCthonia)'
-          PAPER_BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" \
-            "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds")
+          PAPER_BUILDS=$(curl -fsSL -H "User-Agent: ${USER_AGENT}" "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds")
           PAPER_URL=$(echo "${PAPER_BUILDS}" | jq -r 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url) // empty')
           if [ -z "${PAPER_URL}" ]; then
             echo "No stable Paper ${PAPER_VERSION} build was returned by the PaperMC Fill API." >&2
             exit 1
           fi
           curl -fsSL -H "User-Agent: ${USER_AGENT}" -o server/paper.jar "${PAPER_URL}"
-
-          SFL_RELEASE=$(curl -fsSL \
-            -H 'Accept: application/vnd.github+json' \
-            -H "User-Agent: ${USER_AGENT}" \
-            https://api.github.com/repos/wickidcow/Slimefun-Legacy/releases/latest)
+          SFL_RELEASE=$(curl -fsSL -H 'Accept: application/vnd.github+json' -H "User-Agent: ${USER_AGENT}" https://api.github.com/repos/wickidcow/Slimefun-Legacy/releases/latest)
           SFL_URL=$(echo "${SFL_RELEASE}" | jq -r '.assets[] | select(.name | startswith("Slimefun-Legacy") and endswith(".jar")) | .browser_download_url' | head -n 1)
           if [ -z "${SFL_URL}" ] || [ "${SFL_URL}" = 'null' ]; then
             echo 'Could not resolve the latest Slimefun Legacy JAR asset.' >&2
@@ -148,10 +148,8 @@ jobs:
           set -euo pipefail
           cd server
           echo 'eula=true' > eula.txt
-
           echo 'Plugin directory before startup:'
           find plugins -maxdepth 1 -type f -printf '%f\n' | sort
-
           java -Xms512M -Xmx1G -jar paper.jar --nogui > console.log 2>&1 &
           SERVER_PID=$!
           cleanup() {
@@ -159,7 +157,6 @@ jobs:
             wait "${SERVER_PID}" 2>/dev/null || true
           }
           trap cleanup EXIT
-
           READY=0
           for _ in $(seq 1 120); do
             if grep -q 'Done (' console.log 2>/dev/null; then
@@ -171,24 +168,19 @@ jobs:
             fi
             sleep 1
           done
-
           cat console.log
-
           if [ "${READY}" -ne 1 ]; then
             echo 'Paper did not reach a successful startup state.' >&2
             exit 1
           fi
-
           if grep -Eiq "Unsupported API version|Error occurred while enabling RelicsOfCthonia|Could not load.*RelicsOfCthonia|NoClassDefFoundError.*relicsofcthonia|NoSuchMethodError.*relicsofcthonia" console.log; then
             echo 'Relics of Cthonia reported an API/runtime linkage or enable failure.' >&2
             exit 1
           fi
-
           if ! grep -q 'RelicsOfCthonia' console.log; then
             echo 'Relics of Cthonia did not appear in the Paper startup log.' >&2
             exit 1
           fi
-
           if ! grep -q 'Addon compatibility: 1 compatible, 0 warning, 0 undeclared, 0 incompatible, 0 disabled' console.log; then
             echo 'Slimefun Legacy did not classify Relics of Cthonia as compatible.' >&2
             exit 1
@@ -244,7 +236,6 @@ jobs:
           JAR="dist/${OUTPUT_NAME}"
           NOTES_FILE="docs/releases/${RELEASE_VERSION}.md"
           TITLE="Relics of Cthonia ${RELEASE_VERSION} — Slimefun Legacy"
-
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq '.object.sha')"
             if [[ "$TAG_SHA" != "$GITHUB_SHA" ]]; then
@@ -252,7 +243,6 @@ jobs:
               echo 'Bump the Maven project version for the next release.'
               exit 0
             fi
-
             gh release upload "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --clobber
             if [[ -f "$NOTES_FILE" ]]; then
               gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file "$NOTES_FILE"
@@ -263,6 +253,6 @@ jobs:
             if [[ -f "$NOTES_FILE" ]]; then
               gh release create "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$NOTES_FILE"
             else
-              gh release create "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --generate-notes
+              gh release create "$RELEASE_TAG" "$JAR" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TITLE" --notes "Relics of Cthonia ${RELEASE_VERSION} adds Paper 26.3 alpha compile validation while preserving the Java 21 / Paper 1.21.11 universal release baseline and stable runtime smoke tests on Paper 1.21.11 and 26.2."
             fi
           fi
