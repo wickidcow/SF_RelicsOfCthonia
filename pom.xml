@@ -6,18 +6,15 @@
 
     <groupId>ne.fnfal113</groupId>
     <artifactId>RelicsOfCthonia</artifactId>
-    <version>2.0.2</version>
+    <version>2.0.3</version>
     <packaging>jar</packaging>
 
     <name>RelicsOfCthonia</name>
-
     <description>My Slimefun addon jam 2022 entry which is based on nether theme</description>
     <properties>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Compile against the oldest supported Paper API so accidental 26.x-only
-             linkage is caught during the normal Maven build. -->
         <paper.version>1.21.11-R0.1-SNAPSHOT</paper.version>
         <lombok.version>1.18.44</lombok.version>
     </properties>
@@ -28,64 +25,36 @@
         <finalName>SF_RelicsOfCthonia${project.version}</finalName>
         <defaultGoal>clean package</defaultGoal>
         <sourceDirectory>${basedir}/src/main/java</sourceDirectory>
-
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
-                <includes>
-                    <include>*</include>
-                    <include>json/*</include>
-                </includes>
+                <includes><include>*</include><include>json/*</include></includes>
             </resource>
         </resources>
-
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.0</version>
                 <configuration>
                     <release>${maven.compiler.release}</release>
                     <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
+                        <path><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><version>${lombok.version}</version></path>
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.0</version>
                 <configuration>
                     <relocations>
-                        <relocation>
-                            <pattern>org.bstats</pattern>
-                            <shadedPattern>ne.fnfal113.relicsofcthonia.bstats</shadedPattern>
-                        </relocation>
-                        <relocation>
-                            <pattern>io.github.bakedlibs.dough.updater</pattern>
-                            <shadedPattern>ne.fnfal113.relicsofcthonia.dough.updater</shadedPattern>
-                        </relocation>
-                        <relocation>
-                            <pattern>io.github.bakedlibs.dough.versions</pattern>
-                            <shadedPattern>ne.fnfal113.relicsofcthonia.dough.versions</shadedPattern>
-                        </relocation>
+                        <relocation><pattern>org.bstats</pattern><shadedPattern>ne.fnfal113.relicsofcthonia.bstats</shadedPattern></relocation>
+                        <relocation><pattern>io.github.bakedlibs.dough.updater</pattern><shadedPattern>ne.fnfal113.relicsofcthonia.dough.updater</shadedPattern></relocation>
+                        <relocation><pattern>io.github.bakedlibs.dough.versions</pattern><shadedPattern>ne.fnfal113.relicsofcthonia.dough.versions</shadedPattern></relocation>
                     </relocations>
                 </configuration>
                 <executions>
                     <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <minimizeJar>true</minimizeJar>
-                        </configuration>
+                        <phase>package</phase><goals><goal>shade</goal></goals>
+                        <configuration><createDependencyReducedPom>false</createDependencyReducedPom><minimizeJar>true</minimizeJar></configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -93,70 +62,18 @@
     </build>
 
     <repositories>
-        <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
-        </repository>
-
-        <repository>
-            <id>papermc</id>
-            <url>https://repo.papermc.io/repository/maven-public/</url>
-        </repository>
-
-        <repository>
-            <id>sonatype</id>
-            <url>https://oss.sonatype.org/content/groups/public/</url>
-        </repository>
+        <repository><id>jitpack.io</id><url>https://jitpack.io</url></repository>
+        <repository><id>papermc</id><url>https://repo.papermc.io/repository/maven-public/</url></repository>
+        <repository><id>sonatype</id><url>https://oss.sonatype.org/content/groups/public/</url></repository>
     </repositories>
 
     <dependencies>
-        <dependency>
-            <groupId>io.papermc.paper</groupId>
-            <artifactId>paper-api</artifactId>
-            <version>${paper.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.Slimefun</groupId>
-            <artifactId>Slimefun4</artifactId>
-            <version>RC-37</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-            <version>3.0.2</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.baked-libs.dough</groupId>
-            <artifactId>dough-updater</artifactId>
-            <version>fcdbd45aa0</version>
-            <scope>compile</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.baked-libs.dough</groupId>
-            <artifactId>dough-common</artifactId>
-            <version>fcdbd45aa0</version>
-            <scope>compile</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.bstats</groupId>
-            <artifactId>bstats-bukkit</artifactId>
-            <version>3.2.1</version>
-            <scope>compile</scope>
-        </dependency>
+        <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>${paper.version}</version><scope>provided</scope></dependency>
+        <dependency><groupId>com.github.Slimefun</groupId><artifactId>Slimefun4</artifactId><version>RC-37</version><scope>provided</scope></dependency>
+        <dependency><groupId>com.google.code.findbugs</groupId><artifactId>jsr305</artifactId><version>3.0.2</version><scope>provided</scope></dependency>
+        <dependency><groupId>com.github.baked-libs.dough</groupId><artifactId>dough-updater</artifactId><version>fcdbd45aa0</version><scope>compile</scope></dependency>
+        <dependency><groupId>com.github.baked-libs.dough</groupId><artifactId>dough-common</artifactId><version>fcdbd45aa0</version><scope>compile</scope></dependency>
+        <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><version>${lombok.version}</version><scope>provided</scope></dependency>
+        <dependency><groupId>org.bstats</groupId><artifactId>bstats-bukkit</artifactId><version>3.2.1</version><scope>compile</scope></dependency>
     </dependencies>
 </project>
